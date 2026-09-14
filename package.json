@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "@cyanheads/musicbrainz-mcp-server": "^0.1.6",
     "@supabase/server": "^1.6.0",
     "@tonejs/midi": "^2.0.28",
     "postgres": "^3.4.9"

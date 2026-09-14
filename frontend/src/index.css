@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* The Score Shelf — a warm, sheet-music-inspired identity.
+     Parchment canvas, ivory cards, warm ink, burnt-sienna as the action color. */
+  :root {
+    --background: 40 34% 90%; /* parchment canvas */
+    --foreground: 30 13% 18%; /* warm ink */
+    --card: 45 60% 98%; /* ivory paper */
+    --card-foreground: 30 13% 18%;
+    --primary: 15 51% 40%; /* burnt sienna — selected / ready to act */
+    --primary-foreground: 45 60% 98%;
+    --secondary: 27 56% 89%; /* parchment tag */
+    --secondary-foreground: 30 13% 18%;
+    --muted: 27 56% 89%;
+    --muted-foreground: 33 14% 42%; /* muted brown */
+    --accent: 18 45% 46%; /* softer sienna for target/highlights */
+    --accent-foreground: 45 60% 98%;
+    --border: 37 30% 82%; /* paper-edge border */
+    --rule: 37 30% 78%; /* paper-edge line: staff lines, unplayed waveform */
+    --input: 37 30% 82%;
+    --ring: 15 51% 40%;
+    --radius: 0.5rem; /* small corners */
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+  /* Always reserve the scrollbar gutter so centered content doesn't shift
+     when filtering changes the list length (scrollbar appears/disappears). */
+  /* The standard scrollbar-color is required too: Chrome ignores the gutter
+     on the page scrollbar while it's styled with ::-webkit-scrollbar. */
+  html {
+    scrollbar-gutter: stable;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  /* Same for scrollable panels (detail sheet, practice log), so their content
+     keeps its width whether or not it overflows. */
+  .overflow-y-auto,
+  .overflow-auto {
+    scrollbar-gutter: stable;
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family:
+      var(--font-sans),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Playfair for the reading voice — song titles and page headings */
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family:
+      var(--font-display), ui-serif, Georgia, "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  /* Paper grain — a fixed, faint fractal-noise wash over the whole canvas.
+     Baked as an inline SVG data URI so there is no image asset or dependency. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+}
+
+/* Fibrous paper texture on ivory surfaces (cards, sheets). */
+.bg-card {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");
+  background-blend-mode: multiply;
+}
+
+/* Thin custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Component animation keyframes (kept global to avoid inline <style> churn) */
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

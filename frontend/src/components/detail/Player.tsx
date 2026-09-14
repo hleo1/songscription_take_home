@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useWavesurfer } from "@wavesurfer/react";
-import { Pause, Play } from "lucide-react";
+import { Headphones, Pause } from "lucide-react";
 import { fmtDuration } from "@/lib/format";
 import type { Song } from "@/lib/models";
 import { claimPlayback } from "@/lib/playback";
@@ -97,7 +97,7 @@ function Waveform({ url, title }: { url: string; title: string }) {
         {isPlaying ? (
           <Pause className="h-4 w-4 fill-current" />
         ) : (
-          <Play className="ml-0.5 h-4 w-4 fill-current" />
+          <Headphones className="h-4 w-4" />
         )}
       </button>
       <div className="min-w-0 flex-1">

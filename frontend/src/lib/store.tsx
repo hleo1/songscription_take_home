@@ -8,6 +8,7 @@ import type {
   Song,
   SongWithHistory,
 } from "@/lib/models";
+import { pausePlayback } from "@/lib/playback";
 export type { Editable } from "@/lib/models";
 export type ViewMode = LibrarySettings["view"];
 export type SortKey = LibrarySettings["sort"];
@@ -141,6 +142,7 @@ export function StoreProvider({
   // Selects a song and fetches its history (plus the song itself when it isn't
   // on `page`). Edits made while that loads are kept.
   const openSong = (id: string, page: Data | null) => {
+    if (selectedRef.current !== id) pausePlayback();
     selectedRef.current = id;
     setSelected(id);
     const song = page?.songs.find((s) => s.id === id);

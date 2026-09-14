@@ -21,7 +21,6 @@ export function SongGrid() {
             <div className="relative">
               <Cover
                 song={s}
-                showPlay={false}
                 className="aspect-square w-full transition-transform duration-300 group-hover:-translate-y-1"
               />
               <button

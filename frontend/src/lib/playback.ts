@@ -6,3 +6,8 @@ export function claimPlayback(media: HTMLMediaElement) {
   if (current && current !== media) current.pause();
   current = media;
 }
+
+/** Pauses whatever is playing, e.g. when the detail panel opens another song. */
+export function pausePlayback() {
+  current?.pause();
+}

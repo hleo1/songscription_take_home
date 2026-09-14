@@ -73,7 +73,6 @@ function DetailContent({
           <Cover
             song={song}
             className="h-16 w-16 shrink-0 border border-border sm:h-20 sm:w-20"
-            showPlay={false}
           />
           <div className="min-w-0 flex-1 pt-1">
             <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">

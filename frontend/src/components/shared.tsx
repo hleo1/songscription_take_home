@@ -1,7 +1,7 @@
 import { relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Song } from "@/lib/models";
-import { Play, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 
 /** A monochrome image asset tinted with the current text color (CSS mask). */
 export function MaskIcon({
@@ -48,11 +48,9 @@ export function LastPractice({ song }: { song: Song }) {
 export function Cover({
   song,
   className,
-  showPlay = true,
 }: {
   song: Song;
   className?: string;
-  showPlay?: boolean;
 }) {
   // Hash the id so every song gets its own pattern (uploaded ids are UUIDs).
   let seed = 0;
@@ -69,7 +67,7 @@ export function Cover({
   return (
     <div
       className={cn(
-        "group/cover relative overflow-hidden rounded-lg bg-card",
+        "relative overflow-hidden rounded-lg bg-card",
         className,
       )}
     >
@@ -122,17 +120,6 @@ export function Cover({
             </g>
           ))}
         </svg>
-      )}
-      {showPlay && (
-        // Hover affordance only; the surrounding card handles the click.
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 grid place-items-center bg-card/40 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover/cover:opacity-100"
-        >
-          <span className="grid h-10 w-10 scale-90 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform duration-200 group-hover/cover:scale-100">
-            <Play className="h-4 w-4 translate-x-[1px] fill-current" />
-          </span>
-        </span>
       )}
     </div>
   );

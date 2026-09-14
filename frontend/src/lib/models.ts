@@ -1,76 +1,26 @@
-import { z } from "zod";
+/* API shapes, matching the FastAPI models (backend/app/models.py), which
+   validate every request. */
 
-/* ---- Request validation (zod) ---- */
-
-export const handSchema = z.enum(["left", "right", "both"]);
 /** A user's desired playback settings for one song. */
-export const editableSchema = z
-  .object({
-    bpm: z.number().int().min(20).max(240),
-    hand: handSchema,
-    transpose: z.number().int().min(-12).max(12),
-    tags: z
-      .array(z.string().trim().min(1).max(40))
-      .max(20)
-      .transform((v) => [...new Set(v)]),
-    favorite: z.boolean(),
-  })
-  .strict();
-/** The playback settings Start Practice saves before opening a session. */
-export const practiceSettingsSchema = editableSchema
-  .pick({ bpm: true, hand: true, transpose: true })
-  .partial();
-export const settingsSchema = z
-  .object({
-    view: z.enum(["list", "grid"]),
-    genreFilter: z
-      .array(z.string().trim().min(1).max(80))
-      .max(50)
-      .transform((v) => [...new Set(v)]),
-    tagsFilter: z
-      .array(z.string().trim().min(1).max(40))
-      .max(50)
-      .transform((v) => [...new Set(v)]),
-    favoriteOnly: z.boolean(),
-    sort: z.enum(["recent", "added", "alpha"]),
-    dir: z.enum(["asc", "desc"]),
-    // Playback settings: stored and editable, not yet applied to audio.
-    instrument: z.enum(["grand", "bright", "electric", "felt"]),
-    volume: z.number().int().min(0).max(100),
-  })
-  .strict();
-// Patch accepted by PATCH /api/songs/[id]: per-user settings (Editable) plus the
-// song-level title, which lives on the songs table rather than song_settings.
-export const songPatchSchema = editableSchema
-  .partial()
-  .extend({ title: z.string().trim().min(1).max(200).optional() })
-  .strict();
-export const newSongSchema = z
-  .object({
-    title: z.string().trim().min(1).max(200),
-    artist: z.string().trim().min(1).max(200),
-    genre: z.string().trim().min(1).max(80),
-    durationSec: z.number().int().min(1).max(86400),
-    bpm: z.number().int().min(20).max(240),
-    originalRoot: z.number().int().min(0).max(11),
-    originalMode: z.enum(["Major", "Minor"]),
-    audioUrl: z
-      .url()
-      .refine((v) => /^https?:\/\//.test(v), "Use an HTTP or HTTPS audio URL")
-      .nullable(),
-    coverUrl: z
-      .url()
-      .refine((v) => /^https?:\/\//.test(v), "Use an HTTP or HTTPS image URL")
-      .nullable(),
-  })
-  .strict();
+export interface Editable {
+  bpm: number;
+  hand: "left" | "right" | "both";
+  transpose: number;
+  tags: string[];
+  favorite: boolean;
+}
 
-export type Hand = z.infer<typeof handSchema>;
-export type Editable = z.infer<typeof editableSchema>;
-export type LibrarySettings = z.infer<typeof settingsSchema>;
-export type NewSong = z.infer<typeof newSongSchema>;
-
-/* ---- API response shapes ---- */
+export interface LibrarySettings {
+  view: "list" | "grid";
+  genreFilter: string[];
+  tagsFilter: string[];
+  favoriteOnly: boolean;
+  sort: "recent" | "added" | "alpha";
+  dir: "asc" | "desc";
+  // Playback settings: stored and editable, not yet applied to audio.
+  instrument: "grand" | "bright" | "electric" | "felt";
+  volume: number;
+}
 
 /** A completed practice session. `minutes` is derived from date → endTime on read. */
 export interface PracticeLog {

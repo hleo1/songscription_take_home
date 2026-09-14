@@ -48,7 +48,10 @@ export default function Settings() {
         keepalive: true,
       });
       if (!r.ok)
-        throw Error((await r.json()).error || "Could not save your settings.");
+        throw Error(
+          (await r.json().catch(() => ({}))).error ||
+            "Could not save your settings.",
+        );
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not save your settings.",

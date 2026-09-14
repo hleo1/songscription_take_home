@@ -51,6 +51,8 @@ interface Store extends LibrarySettings {
   allTags: string[];
   previousSearches: string[];
   saving: boolean;
+  /** Edits are queued but not saved (a write failed and awaits Retry). */
+  unsaved: boolean;
   loading: boolean;
   error: string | null;
   retry: () => void;
@@ -68,17 +70,12 @@ const Ctx = createContext<Store | null>(null);
 export function StoreProvider({
   children,
   initialData,
-  previewData,
 }: {
   children: React.ReactNode;
   /** The first page, rendered on the server; skips the initial client fetch. */
   initialData?: Data;
-  /** Fixed data for design previews; nothing is fetched or saved. */
-  previewData?: Data;
 }) {
-  const [data, setData] = useState<Data | null>(
-    previewData ?? initialData ?? null,
-  );
+  const [data, setData] = useState<Data | null>(initialData ?? null);
   const [selectedId, setSelected] = useState<string | null>(null);
   const selectedRef = useRef<string | null>(null);
   // The open song as last seen, with its history once fetched. The panel reads
@@ -115,7 +112,6 @@ export function StoreProvider({
     });
   };
   const load = async () => {
-    if (previewData) return;
     const version = ++generation.current;
     setLoading(true);
     try {
@@ -127,7 +123,8 @@ export function StoreProvider({
       apply(d, version);
       return d;
     } finally {
-      setLoading(false);
+      // A newer request still in flight owns the spinner.
+      if (version === generation.current) setLoading(false);
     }
   };
   // A failed catalog load isn't shown to the user: the last page (or the
@@ -149,7 +146,6 @@ export function StoreProvider({
     setPinned(
       song && page ? { song, meta: page.metadata[id], history: null } : null,
     );
-    if (previewData) return;
     fetch(`/api/songs/${encodeURIComponent(id)}`, { cache: "no-store" })
       .then((r) =>
         r.ok ? (r.json() as Promise<SongWithHistory>) : Promise.reject(),
@@ -182,7 +178,6 @@ export function StoreProvider({
     new URLSearchParams(window.location.search).get("song");
   const showSong = (id: string, page: Data | null) => {
     openSong(id, page);
-    if (previewData) return;
     const url = `?song=${encodeURIComponent(id)}`;
     if (pushed.current) window.history.replaceState(null, "", url);
     else window.history.pushState(null, "", url);
@@ -223,11 +218,12 @@ export function StoreProvider({
     // dropped change) and needs a re-fetch. rejected: a change was dropped.
     let stale = false;
     let rejected = false;
+    let version = generation.current;
     try {
       while (queue.current.length) {
         const c = queue.current[0];
         sending.current = c;
-        const version = ++generation.current;
+        version = ++generation.current;
         // A PATCH returns the refreshed page, so no follow-up GET is needed.
         const r =
           c.method === "PATCH"
@@ -267,11 +263,11 @@ export function StoreProvider({
       busy.current = false;
       sending.current = null;
       setSaving(false);
-      setLoading(false);
+      // A newer request still in flight owns the spinner.
+      if (version === generation.current) setLoading(false);
     }
   };
   const enqueue = (change: Change) => {
-    if (previewData) return;
     const last = queue.current.at(-1);
     // Quick repeated edits to one target (e.g. tapping tempo +) merge into the
     // queued PATCH that hasn't been sent yet, so a burst costs one request.
@@ -303,7 +299,7 @@ export function StoreProvider({
   // the write comes back with the new page (drain clears it).
   const settings = (patch: Partial<LibrarySettings>) => {
     pageRef.current = 1;
-    if (!previewData) setLoading(true);
+    setLoading(true);
     setData((d) => (d ? { ...d, settings: { ...d.settings, ...patch } } : d));
     enqueue({ url: "/api/settings", method: "PATCH", body: patch });
   };
@@ -392,7 +388,7 @@ export function StoreProvider({
         // returns include the term just submitted.
         submitSearch: (term) => {
           applySearch(term);
-          if (!term.trim() || previewData) return void refresh();
+          if (!term.trim()) return void refresh();
           void fetch("/api/searches", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -428,6 +424,7 @@ export function StoreProvider({
         allTags: data.allTags,
         previousSearches: data.previousSearches,
         saving,
+        unsaved: !saving && queue.current.length > 0,
         loading,
         error,
         // Re-sends queued changes; with nothing queued the failure was a load,

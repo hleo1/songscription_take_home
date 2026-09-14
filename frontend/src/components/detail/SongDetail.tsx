@@ -301,15 +301,16 @@ function ConfirmDelete({ song, onClose }: { song: Song; onClose: () => void }) {
 
 function PracticeEntry({ song }: { song: Song }) {
   const router = useRouter();
-  const { getMeta, error: saveError } = useStore();
+  const { getMeta, unsaved } = useStore();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
     <section>
       {/* Not disabled while saving: the start request sends the current tempo /
-          transpose / hands itself, so it needn't wait for queued writes. */}
+          transpose / hands itself, so it needn't wait for queued writes. It is
+          disabled after a failed save, whose edits leaving would discard. */}
       <Button
-        disabled={busy || !!saveError}
+        disabled={busy || unsaved}
         className="w-full"
         onClick={async () => {
           setBusy(true);
@@ -324,7 +325,8 @@ function PracticeEntry({ song }: { song: Song }) {
                 settings: { bpm, hand, transpose },
               }),
             });
-            const result = await r.json();
+            // A proxy error (backend down) may not be JSON.
+            const result = await r.json().catch(() => ({}));
             if (!r.ok) throw Error(result.error || "Could not start practice");
             router.push(`/practice?id=${result.id}`);
           } catch (e) {

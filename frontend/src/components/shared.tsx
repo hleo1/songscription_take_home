@@ -43,8 +43,8 @@ export function LastPractice({ song }: { song: Song }) {
   );
 }
 
-/** Notation thumbnail — a sheet-music staff with notes, deterministic per song.
-    Score-led artwork per the Score Shelf identity (no decorative cover art). */
+/** The song's cover image, or a sheet-music staff with notes, deterministic
+    per song, when it has none. */
 export function Cover({
   song,
   className,

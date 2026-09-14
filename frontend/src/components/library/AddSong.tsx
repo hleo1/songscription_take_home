@@ -25,7 +25,7 @@ export function AddSong({
   const busy = useRef(false);
   useEscape(onClose, { enabled: open });
   useScrollLock(open);
-  // POSTs an MP3 file through the existing upload pipeline.
+  // POSTs the MP3 to /api/songs, reporting upload progress.
   const send = (toSend: File) => {
     setStatus("uploading");
     setProgress(0);

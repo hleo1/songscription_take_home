@@ -99,7 +99,7 @@
   background: transparent;
 }
 
-/* Component animation keyframes (kept global to avoid inline <style> churn) */
+/* Keyframes used by inline `animation` styles */
 @keyframes sheet-in {
   from {
     transform: translateX(100%);

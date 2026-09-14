@@ -228,9 +228,9 @@ function PracticeLogModal({
             </div>
           ) : (
             <ul className="divide-y divide-border/60">
-              {logs.map((l, i) => (
+              {logs.map((l) => (
                 <li
-                  key={i}
+                  key={l.id}
                   className="flex items-center justify-between gap-3 px-2 py-2.5"
                 >
                   <div className="flex items-center gap-2.5">

@@ -1,13 +1,18 @@
 import random
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
-from .models import LibrarySettings, NewSong
+from .models import NewSong
 from .supabase_client import BUCKET, admin
 
 # Single local-prototype identity. Replace with a verified session before any
 # public deployment (and add RLS keyed on auth.uid()).
 USER_ID = "local-demo"
+
+# Runs independent Supabase requests concurrently. Only leaf queries are
+# submitted (never work that submits more), so the pool can't deadlock.
+_pool = ThreadPoolExecutor(max_workers=16, thread_name_prefix="supabase")
 
 
 def now_iso() -> str:
@@ -17,25 +22,26 @@ def now_iso() -> str:
 
 def get_settings() -> dict:
     """The user's library settings; active filters live one-per-row in library_filters."""
-    sb = admin()
-    row = sb.table("library_settings").select("*").eq("user_id", USER_ID).single().execute().data
-    filters = sb.table("library_filters").select("kind,value").eq("user_id", USER_ID).execute().data
+    # admin() is called inside the task: each thread must use its own client.
+    filters_f = _pool.submit(
+        lambda: admin().table("library_filters").select("kind,value").eq("user_id", USER_ID).execute().data
+    )
+    row = admin().table("library_settings").select("*").eq("user_id", USER_ID).single().execute().data
+    filters = filters_f.result()
 
     def of(kind: str) -> list[str]:
         return sorted(f["value"] for f in filters if f["kind"] == kind)
 
-    return LibrarySettings.model_validate(
-        {
-            "view": row["view"],
-            "genreFilter": of("genre"),
-            "tagsFilter": of("tag"),
-            "favoriteOnly": row["favoriteOnly"],
-            "sort": row["sort"],
-            "dir": row["dir"],
-            "instrument": row["instrument"],
-            "volume": row["volume"],
-        }
-    ).model_dump()
+    return {
+        "view": row["view"],
+        "genreFilter": of("genre"),
+        "tagsFilter": of("tag"),
+        "favoriteOnly": row["favoriteOnly"],
+        "sort": row["sort"],
+        "dir": row["dir"],
+        "instrument": row["instrument"],
+        "volume": row["volume"],
+    }
 
 
 def _songs_query():
@@ -76,13 +82,17 @@ def _to_song(row: dict) -> tuple[dict, dict] | None:
 
 def get_catalog_page(page: int, search: str) -> dict:
     """One catalog page. Filtering, sorting and paging run in the catalog_page
-    function; only the page's songs are then fetched with their details."""
-    c = (
-        admin()
+    function; only the page's songs are then fetched with their details.
+    Everything but that second fetch runs concurrently."""
+    catalog_f = _pool.submit(
+        lambda: admin()
         .rpc("catalog_page", {"p_user_id": USER_ID, "p_search": search, "p_page": page})
         .execute()
         .data
     )
+    searches_f = _pool.submit(get_searches)
+    settings = get_settings()
+    c = catalog_f.result()
     songs: list[dict] = []
     metadata: dict[str, dict] = {}
     if c["ids"]:
@@ -96,8 +106,8 @@ def get_catalog_page(page: int, search: str) -> dict:
     return {
         "songs": songs,
         "metadata": metadata,
-        "settings": get_settings(),
-        "previousSearches": get_searches(),
+        "settings": settings,
+        "previousSearches": searches_f.result(),
         "allTags": c["tags"],
         "allGenres": c["genres"],
         "total": c["total"],
@@ -105,10 +115,6 @@ def get_catalog_page(page: int, search: str) -> dict:
         "page": c["page"],
         "pages": c["pages"],
     }
-
-
-def _parse_iso(value: str) -> datetime:
-    return datetime.fromisoformat(value)
 
 
 def get_song(id: str) -> dict | None:
@@ -136,7 +142,10 @@ def get_song(id: str) -> dict | None:
             "date": p["startTime"],
             "endTime": p["endTime"],
             # Duration is derived from the timestamps rather than stored.
-            "minutes": max(0.0, (_parse_iso(p["endTime"]) - _parse_iso(p["startTime"])).total_seconds() / 60),
+            "minutes": max(
+                0.0,
+                (datetime.fromisoformat(p["endTime"]) - datetime.fromisoformat(p["startTime"])).total_seconds() / 60,
+            ),
             "accuracy": p["accuracy"],
         }
         for p in logs
@@ -186,7 +195,7 @@ def create_song(song: NewSong, audio: bytes) -> str:
     sb = admin()
     id = str(uuid.uuid4())
     path = f"{id}.mp3"
-    sb.storage.from_(BUCKET).upload(path, audio, {"content-type": "audio/mpeg", "upsert": "true"})
+    sb.storage.from_(BUCKET).upload(path, audio, {"content-type": "audio/mpeg"})
     try:
         sb.rpc(
             "create_song",
@@ -196,7 +205,7 @@ def create_song(song: NewSong, audio: bytes) -> str:
                 "p_title": song.title,
                 "p_artist": song.artist,
                 "p_genre": song.genre,
-                "p_cover_url": song.coverUrl,  # null → app falls back to the score SVG
+                "p_cover_url": None,  # set later by the cover agent; until then the app shows the score SVG
                 "p_duration": song.durationSec,
                 "p_bpm": song.bpm,
                 "p_root": song.originalRoot,

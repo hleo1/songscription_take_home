@@ -9,7 +9,6 @@ dependencies = [
     "langchain-mcp-adapters>=0.3.2",
     "langchain-openai>=1.6.2",
     "mutagen>=1.48.1",
-    "numpy>=2.5.3",
     "python-dotenv>=1.2.3",
     "supabase>=2.31.0",
 ]

@@ -34,11 +34,13 @@ async def upload_song(request: Request, background: BackgroundTasks) -> dict:
     length = request.headers.get("content-length", "")
     if length.isdigit() and int(length) > MAX_BYTES + 65536:
         raise HTTPException(413, "MP3 must be under 30 MB.")
-    form = await request.form()
-    file = form.get("file")
-    if not isinstance(file, UploadFile) or not (file.filename or "").lower().endswith(".mp3"):
-        raise HTTPException(400, "Choose an MP3 file.")
-    data = await file.read()
+    # Closing the form deletes the temp file a large upload spools to.
+    async with request.form() as form:
+        file = form.get("file")
+        if not isinstance(file, UploadFile) or not (file.filename or "").lower().endswith(".mp3"):
+            raise HTTPException(400, "Choose an MP3 file.")
+        filename = file.filename
+        data = await file.read()
     if not data or len(data) > MAX_BYTES:
         raise HTTPException(413, "MP3 must be between 1 byte and 30 MB.")
     try:
@@ -49,12 +51,8 @@ async def upload_song(request: Request, background: BackgroundTasks) -> dict:
     if mp3.info.layer != 3 or not duration or not math.isfinite(duration):
         raise HTTPException(400, "This file is not a valid MP3 recording.")
 
-    inferred = await analyze_metadata(data, file.filename, id3_tags(mp3), duration)
-    song = NewSong(
-        **inferred.model_dump(),
-        durationSec=max(1, math.floor(duration + 0.5)),
-        coverUrl=None,  # patched asynchronously once the cover agent resolves
-    )
+    inferred = await analyze_metadata(data, filename, id3_tags(mp3), duration)
+    song = NewSong(**inferred.model_dump(), durationSec=max(1, math.floor(duration + 0.5)))
     id = await asyncio.to_thread(db.create_song, song, data)
     # Runs after the response is sent.
     background.add_task(find_and_set_cover, id, song.title, song.artist)
@@ -116,13 +114,18 @@ async def find_cover_url(title: str, artist: str) -> str | None:
 
 def musicbrainz_session():
     """Free MusicBrainz MCP server (no API key), spawned over stdio per use."""
+    # Only what the server needs; the MCP client adds a safe base (HOME, PATH, …),
+    # so the app's secrets never reach this third-party process.
+    env = {"MCP_TRANSPORT_TYPE": "stdio", "MCP_LOG_LEVEL": "error"}
+    if contact := os.environ.get("MUSICBRAINZ_CONTACT"):
+        env["MUSICBRAINZ_CONTACT"] = contact
     client = MultiServerMCPClient(
         {
             "musicbrainz": {
                 "transport": "stdio",
                 "command": shutil.which("node") or "node",
                 "args": [str(ROOT / "node_modules/@cyanheads/musicbrainz-mcp-server/dist/index.js")],
-                "env": {**os.environ, "MCP_TRANSPORT_TYPE": "stdio", "MCP_LOG_LEVEL": "error"},
+                "env": env,
             }
         }
     )
@@ -145,21 +148,16 @@ METADATA_PROMPT = "\n".join(
 async def analyze_metadata(data: bytes, filename: str, tags: dict, duration: float) -> InferredSong:
     if not os.environ.get("OPENAI_API_KEY"):
         raise HTTPException(503, "Metadata analysis requires OPENAI_API_KEY on the server.")
-    # Analysis runs at most once, whether or not the agent calls the tool.
-    measured: asyncio.Future | None = None
-
-    def measure() -> asyncio.Future:
-        nonlocal measured
-        if measured is None:
-            measured = asyncio.ensure_future(asyncio.to_thread(analyze_audio, data))
-        return measured
+    # Analysis starts now, alongside the agent, and runs once: the tool and the
+    # final values share this result.
+    measured = asyncio.create_task(asyncio.to_thread(analyze_audio, data))
 
     @tool(
         "analyze_audio",
         description="Measures the uploaded recording's tempo (bpm), key root (C=0 to B=11), mode (Major/Minor) and key confidence from the decoded audio signal.",
     )
     async def analyze_audio_tool() -> str:
-        return to_json(await measure())
+        return to_json(await asyncio.shield(measured))
 
     try:
         async with musicbrainz_session() as session:
@@ -190,9 +188,10 @@ async def analyze_metadata(data: bytes, filename: str, tags: dict, duration: flo
                 timeout=90,
             )
         # Measured values are authoritative even if the model altered them.
-        audio = {k: v for k, v in (await measure()).items() if k != "keyConfidence"}
+        audio = {k: v for k, v in (await measured).items() if k != "keyConfidence"}
         return InferredSong.model_validate({**result["structured_response"].model_dump(), **audio})
     except Exception:
+        measured.cancel()
         log.exception("metadata analysis failed for %s", filename)
         raise HTTPException(502, "Metadata analysis failed. Please retry the upload.")
 

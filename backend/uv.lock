@@ -1809,7 +1809,6 @@ dependencies = [
     { name = "langchain-mcp-adapters" },
     { name = "langchain-openai" },
     { name = "mutagen" },
-    { name = "numpy" },
     { name = "python-dotenv" },
     { name = "supabase" },
 ]
@@ -1822,7 +1821,6 @@ requires-dist = [
     { name = "langchain-mcp-adapters", specifier = ">=0.3.2" },
     { name = "langchain-openai", specifier = ">=1.6.2" },
     { name = "mutagen", specifier = ">=1.48.1" },
-    { name = "numpy", specifier = ">=2.5.3" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "supabase", specifier = ">=2.31.0" },
 ]

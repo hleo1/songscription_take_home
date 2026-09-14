@@ -123,7 +123,6 @@ class InferredSong(BaseModel):
 
 class NewSong(InferredSong):
     durationSec: Annotated[int, Field(ge=1, le=86400)]
-    coverUrl: HttpUrl | None
 
 
 # ---- Responses ----

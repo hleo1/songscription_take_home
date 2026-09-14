@@ -3,6 +3,9 @@ import tempfile
 
 import essentia.standard as es
 
+# RhythmExtractor2013 only works on 44.1 kHz input, so audio is resampled to it.
+SAMPLE_RATE = 44100
+
 # Essentia spells keys with a mix of sharps and flats.
 ROOTS = {
     "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
@@ -15,12 +18,11 @@ def analyze_audio(mp3: bytes) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".mp3") as f:
         f.write(mp3)
         f.flush()
-        audio, sample_rate, *_ = es.AudioLoader(filename=f.name)()
-    mono = audio.mean(axis=1).astype("float32")
+        mono = es.MonoLoader(filename=f.name, sampleRate=SAMPLE_RATE)()
     key, scale, strength = es.KeyExtractor(
         averageDetuningCorrection=True, frameSize=4096, hopSize=4096, hpcpSize=12,
         maxFrequency=3500, maximumSpectralPeaks=60, minFrequency=25,
-        pcpThreshold=0.2, profileType="bgate", sampleRate=sample_rate,
+        pcpThreshold=0.2, profileType="bgate", sampleRate=SAMPLE_RATE,
     )(mono)  # fmt: skip
     bpm = es.RhythmExtractor2013(maxTempo=208, method="multifeature", minTempo=40)(mono)[0]
     return {
